@@ -33,7 +33,6 @@ class TranslateFragment : Fragment() {
     private lateinit var captureButton: Button
     private lateinit var progressBar: ProgressBar
     private var imageCapture: ImageCapture? = null
-    private lateinit var imageMatcher: ImageMatcher
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -60,7 +59,6 @@ class TranslateFragment : Fragment() {
         captureButton = view.findViewById(R.id.capture_button)
         progressBar = view.findViewById(R.id.progress_bar)
 
-        imageMatcher = ImageMatcher(requireContext())
 
         captureButton.setOnClickListener {
             captureAndMatch()
