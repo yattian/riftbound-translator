@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/navigation_gallery">
+
+    <fragment
+        android:id="@+id/navigation_gallery"
+        android:name="com.example.riftboundtranslator.GalleryFragment"
+        android:label="Card Gallery" />
+
+    <fragment
+        android:id="@+id/navigation_translate"
+        android:name="com.example.riftboundtranslator.TranslateFragment"
+        android:label="Translate" />
+
+</navigation>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/navigation_gallery"
+        android:icon="@drawable/ic_gallery"
+        android:title="Card Gallery" />
+
+    <item
+        android:id="@+id/navigation_translate"
+        android:icon="@drawable/ic_camera"
+        android:title="Translate" />
+</menu>
