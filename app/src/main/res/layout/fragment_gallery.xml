@@ -37,13 +37,13 @@
         android:id="@+id/number_input"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter number"
+        android:hint="Enter card number"
         android:inputType="text"
         android:maxLength="4"
         android:layout_marginTop="8dp"
         android:padding="12dp" />
 
-    <!-- Language Dropdown -->
+    <!-- Language Toggle -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -51,12 +51,31 @@
         android:textStyle="bold"
         android:layout_marginTop="16dp" />
 
-    <Spinner
-        android:id="@+id/language_spinner"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:padding="12dp" />
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/english_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="English"
+            android:layout_marginEnd="8dp"
+            style="?attr/materialButtonOutlinedStyle" />
+
+        <Button
+            android:id="@+id/chinese_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Chinese"
+            android:layout_marginStart="8dp"
+            style="?attr/materialButtonOutlinedStyle" />
+
+    </LinearLayout>
 
     <!-- Find Button -->
     <Button
@@ -64,7 +83,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Find Card"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
         android:padding="16dp" />
 
     <!-- Card Display -->
@@ -73,7 +92,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
         android:visibility="gone"
         app:cardCornerRadius="8dp"
         app:cardElevation="4dp">

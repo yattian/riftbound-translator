@@ -7,13 +7,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.os.Bundle
+import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.ProgressBar
-import android.widget.Toast
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -21,18 +19,27 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.nio.ByteBuffer
-private lateinit var cardTextRecognizer: CardTextRecognizer
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+
 class TranslateFragment : Fragment() {
 
     private lateinit var previewView: PreviewView
     private lateinit var captureButton: Button
     private lateinit var progressBar: ProgressBar
+    private lateinit var detectedTextView: TextView
+    private lateinit var manualEntryButton: Button
     private var imageCapture: ImageCapture? = null
+    private lateinit var cardTextRecognizer: CardTextRecognizer
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -54,14 +61,21 @@ class TranslateFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        cardTextRecognizer = CardTextRecognizer()
+
         previewView = view.findViewById(R.id.camera_preview)
         captureButton = view.findViewById(R.id.capture_button)
         progressBar = view.findViewById(R.id.progress_bar)
+        detectedTextView = view.findViewById(R.id.detected_text)
+        manualEntryButton = view.findViewById(R.id.manual_entry_button)
 
+        cardTextRecognizer = CardTextRecognizer()
 
         captureButton.setOnClickListener {
             captureAndMatch()
+        }
+
+        manualEntryButton.setOnClickListener {
+            showManualEntryDialog()
         }
 
         checkCameraPermission()
@@ -119,7 +133,6 @@ class TranslateFragment : Fragment() {
 
         progressBar.visibility = View.VISIBLE
         captureButton.isEnabled = false
-        captureButton.text = "Processing..."
 
         // Capture image to memory
         imageCapture.takePicture(
@@ -128,9 +141,6 @@ class TranslateFragment : Fragment() {
                 override fun onCaptureSuccess(image: ImageProxy) {
                     val bitmap = imageProxyToBitmap(image)
                     image.close()
-
-                    // Show captured image briefly (freeze effect)
-                    showCapturedPreview(bitmap)
 
                     // Process image in background
                     lifecycleScope.launch {
@@ -141,33 +151,10 @@ class TranslateFragment : Fragment() {
                 override fun onError(exception: ImageCaptureException) {
                     progressBar.visibility = View.GONE
                     captureButton.isEnabled = true
-                    captureButton.text = "Capture"
                     Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
                 }
             }
         )
-    }
-
-    private fun showCapturedPreview(bitmap: Bitmap) {
-        // Create an ImageView to show the captured image
-        val imageView = ImageView(context).apply {
-            setImageBitmap(bitmap)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-        }
-
-        // Add it temporarily over the camera preview
-        (view as ViewGroup).addView(imageView, ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        ))
-
-        // Remove after processing
-        lifecycleScope.launch {
-            kotlinx.coroutines.delay(2000) // Show for 2 seconds
-            withContext(Dispatchers.Main) {
-                (view as ViewGroup).removeView(imageView)
-            }
-        }
     }
 
     private fun imageProxyToBitmap(image: ImageProxy): Bitmap {
@@ -193,15 +180,24 @@ class TranslateFragment : Fragment() {
         withContext(Dispatchers.Main) {
             progressBar.visibility = View.GONE
             captureButton.isEnabled = true
-            captureButton.text = "Capture"
 
             if (detectedCardId != null) {
+                detectedTextView.text = "Found: $detectedCardId"
+                detectedTextView.visibility = View.VISIBLE
+
                 // Try to find matching English card
                 findAndShowEnglishCard(detectedCardId)
+
+                // Hide detected text after 3 seconds
+                lifecycleScope.launch {
+                    delay(3000)
+                    detectedTextView.visibility = View.GONE
+                }
             } else {
+                // Shorter message that won't cut off
                 Toast.makeText(
                     context,
-                    "Couldn't read card ID. Make sure:\n• Bottom of card is visible\n• Good lighting\n• Clear focus",
+                    "No card ID found.\nTry better lighting or Manual Entry",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -250,7 +246,7 @@ class TranslateFragment : Fragment() {
         }
     }
 
-    private fun showResultDialog(matchedFileName: String, confidence: String) {
+    private fun showResultDialog(matchedFileName: String, title: String) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_card_result, null)
         val resultImage = dialogView.findViewById<ImageView>(R.id.result_image)
         val closeButton = dialogView.findViewById<Button>(R.id.close_button)
@@ -266,7 +262,7 @@ class TranslateFragment : Fragment() {
         }
 
         val dialog = AlertDialog.Builder(requireContext())
-            .setTitle(confidence)
+            .setTitle(title)
             .setView(dialogView)
             .create()
 
@@ -275,5 +271,37 @@ class TranslateFragment : Fragment() {
         }
 
         dialog.show()
+    }
+
+    private fun showManualEntryDialog() {
+        // Create a container layout with padding
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 16, 48, 16) // Left, Top, Right, Bottom padding
+        }
+
+        val input = EditText(context).apply {
+            hint = "Enter card ID (e.g. OGN-083)"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+            setSingleLine(true)
+        }
+
+        container.addView(input)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Manual Card Entry")
+            .setMessage("Enter the card ID from the bottom left of the card")
+            .setView(container) // Use container instead of input directly
+            .setPositiveButton("Find") { _, _ ->
+                val cardId = input.text.toString().trim().uppercase()
+                if (cardId.isNotEmpty()) {
+                    findAndShowEnglishCard(cardId)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+
+        // Show keyboard automatically
+        input.requestFocus()
     }
 }

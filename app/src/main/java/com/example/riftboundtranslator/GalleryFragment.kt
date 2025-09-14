@@ -1,26 +1,31 @@
 package com.example.riftboundtranslator
 
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
 import java.io.IOException
-import android.content.Context
-import android.view.inputmethod.InputMethodManager
 
 class GalleryFragment : Fragment() {
 
     private lateinit var setSpinner: Spinner
     private lateinit var numberInput: EditText
-    private lateinit var languageSpinner: Spinner
-    private lateinit var findButton: Button
+    private lateinit var englishButton: Button
+    private lateinit var chineseButton: Button
     private lateinit var cardView: CardView
     private lateinit var cardImage: ImageView
     private lateinit var errorText: TextView
+
+    private var currentLanguage = "english"
+    private var lastLoadedCardId: String? = null
+
+    private lateinit var findButton: Button
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -36,41 +41,72 @@ class GalleryFragment : Fragment() {
         // Initialize views
         setSpinner = view.findViewById(R.id.set_spinner)
         numberInput = view.findViewById(R.id.number_input)
-        languageSpinner = view.findViewById(R.id.language_spinner)
-        findButton = view.findViewById(R.id.find_button)
+        englishButton = view.findViewById(R.id.english_button)
+        chineseButton = view.findViewById(R.id.chinese_button)
         cardView = view.findViewById(R.id.card_view)
         cardImage = view.findViewById(R.id.card_image)
         errorText = view.findViewById(R.id.error_text)
 
-        // Set up spinners
-        setupSpinners()
+        findButton = view.findViewById(R.id.find_button)
 
-        // Set up button click
+        // Set up find button click
         findButton.setOnClickListener {
             findCard()
         }
+
+        // Set up spinner
+        setupSpinner()
+
+        // Set up language buttons
+        setupLanguageButtons()
+
+        // Set English as default selected
+        selectLanguage("english")
     }
 
-    private fun hideKeyboard() {
-        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.hideSoftInputFromWindow(numberInput.windowToken, 0)
-    }
-
-    private fun setupSpinners() {
-        // Set spinner
+    private fun setupSpinner() {
         val sets = arrayOf("Origins (OGN)", "Proving Grounds (OGS)")
         val setAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, sets)
         setSpinner.adapter = setAdapter
+    }
 
-        // Language spinner
-        val languages = arrayOf("English", "Chinese")
-        val languageAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, languages)
-        languageSpinner.adapter = languageAdapter
+    private fun setupLanguageButtons() {
+        englishButton.setOnClickListener {
+            selectLanguage("english")
+            // If a card is already displayed, reload it in the new language
+            if (cardView.visibility == View.VISIBLE && lastLoadedCardId != null) {
+                findCard()
+            }
+        }
+
+        chineseButton.setOnClickListener {
+            selectLanguage("chinese")
+            // If a card is already displayed, reload it in the new language
+            if (cardView.visibility == View.VISIBLE && lastLoadedCardId != null) {
+                findCard()
+            }
+        }
+    }
+
+    private fun selectLanguage(language: String) {
+        currentLanguage = language
+
+        // Update button appearances
+        if (language == "english") {
+            englishButton.setBackgroundColor(resources.getColor(android.R.color.holo_blue_dark, null))
+            englishButton.setTextColor(resources.getColor(android.R.color.white, null))
+            chineseButton.setBackgroundColor(resources.getColor(android.R.color.transparent, null))
+            chineseButton.setTextColor(resources.getColor(android.R.color.darker_gray, null))
+        } else {
+            chineseButton.setBackgroundColor(resources.getColor(android.R.color.holo_blue_dark, null))
+            chineseButton.setTextColor(resources.getColor(android.R.color.white, null))
+            englishButton.setBackgroundColor(resources.getColor(android.R.color.transparent, null))
+            englishButton.setTextColor(resources.getColor(android.R.color.darker_gray, null))
+        }
     }
 
     private fun findCard() {
-        // Hide previous results
-        cardView.visibility = View.GONE
+        // Hide error
         errorText.visibility = View.GONE
 
         // Get inputs
@@ -82,13 +118,15 @@ class GalleryFragment : Fragment() {
 
         val numberText = numberInput.text.toString().trim()
         if (numberText.isEmpty()) {
-            showError("Please enter a card number")
+            // Don't show error if just switching languages with no input
+            if (lastLoadedCardId == null) {
+                showError("Please enter a card number")
+            }
             return
         }
 
         // Handle special characters
         val processedNumber = if (numberText.endsWith("*")) {
-            // Replace * with s (e.g., 299* becomes 299s)
             numberText.dropLast(1) + "s"
         } else {
             numberText
@@ -104,15 +142,11 @@ class GalleryFragment : Fragment() {
         // Combine padded number with suffix
         val finalNumber = paddedNumber + suffixPart
 
-        val language = when (languageSpinner.selectedItemPosition) {
-            0 -> "english"
-            1 -> "chinese"
-            else -> "english"
-        }
-
-        // Construct filename
+        // Construct card ID
         val cardId = "$selectedSet-$finalNumber"
-        val folderName = "${language}_cards"
+        lastLoadedCardId = cardId
+
+        val folderName = "${currentLanguage}_cards"
 
         // Try to load the card
         loadCard(folderName, cardId)
@@ -146,6 +180,7 @@ class GalleryFragment : Fragment() {
 
             if (!loaded) {
                 showError("Card not found: $cardId")
+                cardView.visibility = View.GONE
             }
 
         } catch (e: Exception) {
@@ -157,5 +192,10 @@ class GalleryFragment : Fragment() {
     private fun showError(message: String) {
         errorText.text = message
         errorText.visibility = View.VISIBLE
+    }
+
+    private fun hideKeyboard() {
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(numberInput.windowToken, 0)
     }
 }
