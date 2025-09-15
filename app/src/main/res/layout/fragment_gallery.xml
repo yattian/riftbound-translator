@@ -41,15 +41,8 @@
         android:inputType="text"
         android:maxLength="4"
         android:layout_marginTop="8dp"
-        android:padding="12dp" />
-
-    <!-- Language Toggle -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Language"
-        android:textStyle="bold"
-        android:layout_marginTop="16dp" />
+        android:padding="12dp"
+        android:imeOptions="actionDone" />
 
     <LinearLayout
         android:layout_width="match_parent"

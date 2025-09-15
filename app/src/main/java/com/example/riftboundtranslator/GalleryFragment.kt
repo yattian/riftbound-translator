@@ -62,6 +62,16 @@ class GalleryFragment : Fragment() {
 
         // Set English as default selected
         selectLanguage("english")
+
+        numberInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                findCard()
+                true
+            } else {
+                false
+            }
+        }
+
     }
 
     private fun setupSpinner() {
