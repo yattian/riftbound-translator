@@ -112,7 +112,11 @@ class CardTextRecognizer {
             }
     }
 
-    // Focus on bottom-left area where card ID is located
+    /**
+     * Crops bitmap to bottom-left area where card ID is located.
+     * Returns a NEW bitmap that must be recycled by the caller.
+     * The original bitmap is NOT recycled by this method.
+     */
     fun cropToBottomArea(bitmap: Bitmap): Bitmap {
         val height = bitmap.height
         val width = bitmap.width

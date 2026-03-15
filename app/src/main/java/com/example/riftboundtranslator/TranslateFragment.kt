@@ -7,11 +7,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.os.Bundle
-import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.ProgressBar
+import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -37,7 +40,6 @@ class TranslateFragment : Fragment() {
     private lateinit var captureButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var detectedTextView: TextView
-    private lateinit var manualEntryButton: Button
     private var imageCapture: ImageCapture? = null
     private lateinit var cardTextRecognizer: CardTextRecognizer
 
@@ -66,16 +68,11 @@ class TranslateFragment : Fragment() {
         captureButton = view.findViewById(R.id.capture_button)
         progressBar = view.findViewById(R.id.progress_bar)
         detectedTextView = view.findViewById(R.id.detected_text)
-        manualEntryButton = view.findViewById(R.id.manual_entry_button)
 
         cardTextRecognizer = CardTextRecognizer()
 
         captureButton.setOnClickListener {
             captureAndMatch()
-        }
-
-        manualEntryButton.setOnClickListener {
-            showManualEntryDialog()
         }
 
         checkCameraPermission()
@@ -161,77 +158,68 @@ class TranslateFragment : Fragment() {
         val buffer = image.planes[0].buffer
         val bytes = ByteArray(buffer.remaining())
         buffer.get(bytes)
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val originalBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
 
-        // Rotate if needed
+        val rotationDegrees = image.imageInfo.rotationDegrees
+        if (rotationDegrees == 0) {
+            return originalBitmap  // No rotation needed
+        }
+
         val matrix = Matrix()
-        matrix.postRotate(image.imageInfo.rotationDegrees.toFloat())
+        matrix.postRotate(rotationDegrees.toFloat())
 
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        val rotatedBitmap = Bitmap.createBitmap(
+            originalBitmap, 0, 0,
+            originalBitmap.width, originalBitmap.height,
+            matrix, true
+        )
+
+        // CRITICAL: Recycle original if new bitmap was created
+        if (rotatedBitmap != originalBitmap) {
+            originalBitmap.recycle()
+        }
+
+        return rotatedBitmap
     }
 
     private suspend fun processImage(bitmap: Bitmap) {
-        // Try to read card ID from the image
-        val croppedBitmap = cardTextRecognizer.cropToBottomArea(bitmap)
-        val detectedCardId = withContext(Dispatchers.IO) {
-            cardTextRecognizer.findCardId(croppedBitmap)
-        }
-
-        withContext(Dispatchers.Main) {
-            progressBar.visibility = View.GONE
-            captureButton.isEnabled = true
-
-            if (detectedCardId != null) {
-                detectedTextView.text = "Found: $detectedCardId"
-                detectedTextView.visibility = View.VISIBLE
-
-                // Try to find matching English card
-                findAndShowEnglishCard(detectedCardId)
-
-                // Hide detected text after 3 seconds
-                lifecycleScope.launch {
-                    delay(3000)
-                    detectedTextView.visibility = View.GONE
-                }
-            } else {
-                // Shorter message that won't cut off
-                Toast.makeText(
-                    context,
-                    "No card ID found.\nTry better lighting or Manual Entry",
-                    Toast.LENGTH_LONG
-                ).show()
+        var croppedBitmap: Bitmap? = null
+        try {
+            // Try to read card ID from the image
+            croppedBitmap = cardTextRecognizer.cropToBottomArea(bitmap)
+            val detectedCardId = withContext(Dispatchers.IO) {
+                cardTextRecognizer.findCardId(croppedBitmap)
             }
+
+            withContext(Dispatchers.Main) {
+                progressBar.visibility = View.GONE
+                captureButton.isEnabled = true
+
+                if (detectedCardId != null) {
+                    // Show matching English card directly
+                    findAndShowEnglishCard(detectedCardId)
+                } else {
+                    // Show error message if no card ID detected
+                    Toast.makeText(
+                        context,
+                        "No card ID found.\nTry better lighting or use the Gallery tab",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        } finally {
+            // CRITICAL: Always recycle both bitmaps
+            croppedBitmap?.recycle()
+            bitmap.recycle()
         }
     }
 
     private fun findAndShowEnglishCard(cardId: String) {
         try {
-            // List all English cards and find match
-            val englishCards = requireContext().assets.list("english_cards") ?: return
+            val fileName = CardAssetIndex.findCard(cardId, CardConstants.LANGUAGE_ENGLISH)
 
-            // Try different filename formats
-            val possibleNames = listOf(
-                "$cardId.png",
-                "$cardId.jpg",
-                "${cardId.uppercase()}.png",
-                "${cardId.uppercase()}.jpg",
-                "${cardId.lowercase()}.png",
-                "${cardId.lowercase()}.jpg"
-            )
-
-            var matchedFile: String? = null
-            for (fileName in englishCards) {
-                // Check if this file matches our card ID
-                val fileWithoutExtension = fileName.substringBeforeLast(".")
-                if (fileWithoutExtension.equals(cardId, ignoreCase = true) ||
-                    possibleNames.any { it.equals(fileName, ignoreCase = true) }) {
-                    matchedFile = fileName
-                    break
-                }
-            }
-
-            if (matchedFile != null) {
-                showResultDialog(matchedFile, "Card found: $cardId")
+            if (fileName != null) {
+                showResultDialog(fileName, "Card found: $cardId")
             } else {
                 Toast.makeText(
                     context,
@@ -239,7 +227,6 @@ class TranslateFragment : Fragment() {
                     Toast.LENGTH_LONG
                 ).show()
             }
-
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(context, "Error finding card", Toast.LENGTH_SHORT).show()
@@ -247,16 +234,26 @@ class TranslateFragment : Fragment() {
     }
 
     private fun showResultDialog(matchedFileName: String, title: String) {
+        // Hide camera preview while viewing card result
+        previewView.visibility = View.GONE
+
         val dialogView = layoutInflater.inflate(R.layout.dialog_card_result, null)
         val resultImage = dialogView.findViewById<ImageView>(R.id.result_image)
         val closeButton = dialogView.findViewById<Button>(R.id.close_button)
 
         try {
-            // Load English version
-            val inputStream = requireContext().assets.open("english_cards/$matchedFileName")
-            val bitmap = BitmapFactory.decodeStream(inputStream)
-            resultImage.setImageBitmap(bitmap)
-            inputStream.close()
+            val cardId = matchedFileName.substringBeforeLast(".")
+            val bitmap = BitmapCache.loadCard(
+                requireContext(),
+                CardConstants.ENGLISH_CARDS_FOLDER,
+                cardId,
+                maxWidth = 1080,
+                maxHeight = 1920
+            )
+
+            if (bitmap != null) {
+                resultImage.setImageBitmap(bitmap)
+            }
         } catch (e: IOException) {
             e.printStackTrace()
         }
@@ -264,6 +261,11 @@ class TranslateFragment : Fragment() {
         val dialog = AlertDialog.Builder(requireContext())
             .setTitle(title)
             .setView(dialogView)
+            .setOnDismissListener {
+                resultImage.setImageBitmap(null)  // Cache manages lifecycle
+                // Restore camera preview when dialog closes
+                previewView.visibility = View.VISIBLE
+            }
             .create()
 
         closeButton.setOnClickListener {
@@ -273,35 +275,4 @@ class TranslateFragment : Fragment() {
         dialog.show()
     }
 
-    private fun showManualEntryDialog() {
-        // Create a container layout with padding
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 16, 48, 16) // Left, Top, Right, Bottom padding
-        }
-
-        val input = EditText(context).apply {
-            hint = "Enter card ID (e.g. OGN-083)"
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
-            setSingleLine(true)
-        }
-
-        container.addView(input)
-
-        AlertDialog.Builder(requireContext())
-            .setTitle("Manual Card Entry")
-            .setMessage("Enter the card ID from the bottom left of the card")
-            .setView(container) // Use container instead of input directly
-            .setPositiveButton("Find") { _, _ ->
-                val cardId = input.text.toString().trim().uppercase()
-                if (cardId.isNotEmpty()) {
-                    findAndShowEnglishCard(cardId)
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-
-        // Show keyboard automatically
-        input.requestFocus()
-    }
 }

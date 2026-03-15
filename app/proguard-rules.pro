@@ -19,3 +19,24 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep ML Kit classes
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.** { *; }
+
+# Keep CameraX classes
+-keep class androidx.camera.** { *; }
+
+# Keep fragment classes
+-keep public class * extends androidx.fragment.app.Fragment
+
+# Keep Kotlin metadata
+-keep class kotlin.Metadata { *; }
+
+# Suppress warnings
+-dontwarn com.google.mlkit.**
+-dontwarn com.google.android.gms.**
+
+# Keep line numbers for crash reports
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

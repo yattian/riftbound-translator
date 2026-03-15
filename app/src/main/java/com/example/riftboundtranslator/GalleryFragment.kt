@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.cardview.widget.CardView
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import java.io.IOException
 
@@ -22,7 +23,7 @@ class GalleryFragment : Fragment() {
     private lateinit var cardImage: ImageView
     private lateinit var errorText: TextView
 
-    private var currentLanguage = "english"
+    private var currentLanguage = CardConstants.LANGUAGE_ENGLISH
     private var lastLoadedCardId: String? = null
 
     private lateinit var findButton: Button
@@ -75,14 +76,17 @@ class GalleryFragment : Fragment() {
     }
 
     private fun setupSpinner() {
-        val sets = arrayOf("Origins (OGN)", "Proving Grounds (OGS)")
-        val setAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, sets)
+        val setAdapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_dropdown_item,
+            CardConstants.AVAILABLE_SETS
+        )
         setSpinner.adapter = setAdapter
     }
 
     private fun setupLanguageButtons() {
         englishButton.setOnClickListener {
-            selectLanguage("english")
+            selectLanguage(CardConstants.LANGUAGE_ENGLISH)
             // If a card is already displayed, reload it in the new language
             if (cardView.visibility == View.VISIBLE && lastLoadedCardId != null) {
                 findCard()
@@ -90,7 +94,7 @@ class GalleryFragment : Fragment() {
         }
 
         chineseButton.setOnClickListener {
-            selectLanguage("chinese")
+            selectLanguage(CardConstants.LANGUAGE_CHINESE)
             // If a card is already displayed, reload it in the new language
             if (cardView.visibility == View.VISIBLE && lastLoadedCardId != null) {
                 findCard()
@@ -102,16 +106,32 @@ class GalleryFragment : Fragment() {
         currentLanguage = language
 
         // Update button appearances
-        if (language == "english") {
-            englishButton.setBackgroundColor(resources.getColor(android.R.color.holo_blue_dark, null))
-            englishButton.setTextColor(resources.getColor(android.R.color.white, null))
-            chineseButton.setBackgroundColor(resources.getColor(android.R.color.transparent, null))
-            chineseButton.setTextColor(resources.getColor(android.R.color.darker_gray, null))
+        if (language == CardConstants.LANGUAGE_ENGLISH) {
+            englishButton.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), android.R.color.holo_blue_dark)
+            )
+            englishButton.setTextColor(
+                ContextCompat.getColor(requireContext(), android.R.color.white)
+            )
+            chineseButton.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), android.R.color.transparent)
+            )
+            chineseButton.setTextColor(
+                ContextCompat.getColor(requireContext(), android.R.color.darker_gray)
+            )
         } else {
-            chineseButton.setBackgroundColor(resources.getColor(android.R.color.holo_blue_dark, null))
-            chineseButton.setTextColor(resources.getColor(android.R.color.white, null))
-            englishButton.setBackgroundColor(resources.getColor(android.R.color.transparent, null))
-            englishButton.setTextColor(resources.getColor(android.R.color.darker_gray, null))
+            chineseButton.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), android.R.color.holo_blue_dark)
+            )
+            chineseButton.setTextColor(
+                ContextCompat.getColor(requireContext(), android.R.color.white)
+            )
+            englishButton.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), android.R.color.transparent)
+            )
+            englishButton.setTextColor(
+                ContextCompat.getColor(requireContext(), android.R.color.darker_gray)
+            )
         }
     }
 
@@ -121,9 +141,10 @@ class GalleryFragment : Fragment() {
 
         // Get inputs
         val selectedSet = when (setSpinner.selectedItemPosition) {
-            0 -> "OGN"
-            1 -> "OGS"
-            else -> "OGN"
+            0 -> CardConstants.SET_ORIGINS
+            1 -> CardConstants.SET_PROVING_GROUNDS
+            2 -> CardConstants.SET_SFD
+            else -> CardConstants.SET_ORIGINS
         }
 
         val numberText = numberInput.text.toString().trim()
@@ -156,7 +177,11 @@ class GalleryFragment : Fragment() {
         val cardId = "$selectedSet-$finalNumber"
         lastLoadedCardId = cardId
 
-        val folderName = "${currentLanguage}_cards"
+        val folderName = when (currentLanguage) {
+            CardConstants.LANGUAGE_ENGLISH -> CardConstants.ENGLISH_CARDS_FOLDER
+            CardConstants.LANGUAGE_CHINESE -> CardConstants.CHINESE_CARDS_FOLDER
+            else -> CardConstants.ENGLISH_CARDS_FOLDER
+        }
 
         // Try to load the card
         loadCard(folderName, cardId)
@@ -164,31 +189,22 @@ class GalleryFragment : Fragment() {
 
     private fun loadCard(folderName: String, cardId: String) {
         try {
-            // Try different file extensions
-            val extensions = listOf(".png", ".jpg", ".PNG", ".JPG")
-            var loaded = false
+            val maxWidth = cardImage.width.takeIf { it > 0 } ?: 1080
+            val maxHeight = cardImage.height.takeIf { it > 0 } ?: 1920
 
-            for (ext in extensions) {
-                try {
-                    val fileName = "$folderName/$cardId$ext"
-                    val inputStream = requireContext().assets.open(fileName)
-                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                    cardImage.setImageBitmap(bitmap)
-                    inputStream.close()
+            val bitmap = BitmapCache.loadCard(
+                requireContext(),
+                folderName,
+                cardId,
+                maxWidth = maxWidth,
+                maxHeight = maxHeight
+            )
 
-                    cardView.visibility = View.VISIBLE
-                    loaded = true
-
-                    // Hide keyboard when card is found
-                    hideKeyboard()
-
-                    break
-                } catch (e: IOException) {
-                    // Try next extension
-                }
-            }
-
-            if (!loaded) {
+            if (bitmap != null) {
+                cardImage.setImageBitmap(bitmap)
+                cardView.visibility = View.VISIBLE
+                hideKeyboard()
+            } else {
                 showError("Card not found: $cardId")
                 cardView.visibility = View.GONE
             }

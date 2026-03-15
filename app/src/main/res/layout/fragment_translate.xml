@@ -12,7 +12,7 @@
         android:layout_height="0dp"
         android:layout_marginTop="48dp"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@+id/button_container"
+        app:layout_constraintBottom_toTopOf="@+id/capture_button"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -33,7 +33,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Align card ID here"
+        android:text="Align bottom of card here"
         android:textColor="@android:color/white"
         android:textSize="14sp"
         android:background="#80000000"
@@ -59,34 +59,19 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginBottom="16dp" />
 
-    <!-- Button container for side-by-side layout -->
-    <LinearLayout
-        android:id="@+id/button_container"
-        android:layout_width="match_parent"
+    <!-- Capture button -->
+    <Button
+        android:id="@+id/capture_button"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
+        android:layout_margin="16dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
+        android:text="Capture"
+        android:textSize="18sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <Button
-            android:id="@+id/manual_entry_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Manual Entry"
-            android:layout_marginEnd="8dp" />
-
-        <Button
-            android:id="@+id/capture_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Capture"
-            android:layout_marginStart="8dp" />
-
-    </LinearLayout>
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <ProgressBar
         android:id="@+id/progress_bar"
